@@ -56,6 +56,12 @@ const normalizeCGOF = (value: string): string => {
   return 'Assessoria';
 };
 
+// Função auxiliar para garantir que datas vazias sejam enviadas como NULL
+const cleanDate = (date: string | null | undefined): string | null => {
+  if (!date || date.trim() === '') return null;
+  return date;
+};
+
 export const DbService = {
   // --- USERS ---
   getUsers: async (): Promise<User[]> => {
@@ -183,8 +189,9 @@ export const DbService = {
     if (!userRaw) {
         const { count } = await supabase.from('users').select('*', { count: 'exact', head: true });
         if (count === 0) {
+            const adminId = crypto.randomUUID();
             await supabase.from('users').insert({
-                id: crypto.randomUUID(),
+                id: adminId,
                 name: 'Administrador',
                 email: 'admin@sistema.com',
                 password: '123456', 
@@ -205,7 +212,7 @@ export const DbService = {
         const authenticatedUser = { ...userRaw, role: userRaw.role as UserRole };
         await DbService.logAction('LOGIN', `Login realizado`, authenticatedUser);
         localStorage.setItem('procontrol_session_id', userRaw.id);
-        DbService.checkAndSeedData(authenticatedUser);
+        await DbService.checkAndSeedData(authenticatedUser);
         return authenticatedUser;
     }
     return null;
@@ -245,8 +252,7 @@ export const DbService = {
         query = query.or('sector.is.null,sector.eq.""');
       }
       if (params.filters?.emptyExitDate) {
-        // Date columns cannot be compared to empty strings in Postgres/Supabase
-        // They must be checked against NULL.
+        // Garantindo que buscamos apenas NULL para evitar erro de sintaxe em colunas de data
         query = query.is('processDate', null);
       }
 
@@ -260,210 +266,139 @@ export const DbService = {
       const to = from + params.itemsPerPage - 1;
       query = query.range(from, to);
     } else {
-      query = query.order('entryDate', { ascending: false }).limit(20);
+      query = query.order('entryDate', { ascending: false });
     }
 
-    const { data, error, count } = await query;
-
+    const { data, count, error } = await query;
     if (error) {
       console.error('Error fetching processes:', error.message);
       return { data: [], count: 0 };
     }
-
-    const processes = (data || []).map((p: any) => ({
-      ...p,
-      category: p.category || '',
-      CGOF: p.CGOF || '',
-      number: p.number || '',
-      interested: p.interested || '',
-      subject: p.subject || '',
-      sector: p.sector || '',
-      observations: p.observations || '',
-      createdBy: p.createdBy || '',
-      updatedBy: p.updatedBy || '',
-      entryDate: p.entryDate || '',
-      processDate: p.processDate || null,
-      deadline: p.deadline || null
-    })) as Process[];
-
-    return { data: processes, count: count || 0 };
-  },
-
-  getAllProcessesForDashboard: async (): Promise<{data: Process[], count: number}> => {
-    const { data, error } = await supabase
-        .from('processes')
-        .select('id, number, sector, urgent, deadline, entryDate, CGOF, updatedAt, subject, processDate')
-        .order('entryDate', { ascending: false })
-        .limit(10000);
-    
-    const { count } = await supabase.from('processes').select('*', { count: 'exact', head: true });
-
-    if (error) {
-        console.error('Error fetching dashboard data:', error.message);
-        return { data: [], count: 0 };
-    }
-
-    return { data: (data || []) as Process[], count: count || 0 };
-  },
-
-  getUniqueValues: async (type: 'sector' | 'interested' | 'subject'): Promise<string[]> => {
-    const rpcName = type === 'sector' ? 'distinct_setor' : 
-                    type === 'interested' ? 'distinct_interessada' : 
-                    'distinct_assunto';
-
-    try {
-      const { data, error } = await supabase.rpc(rpcName);
-
-      if (error) {
-          console.warn(`RPC ${rpcName} not found.`);
-          return [];
-      }
-
-      return (data || []).map((item: any) => item.value).filter(Boolean);
-    } catch (e) {
-      return [];
-    }
-  },
-
-  getProcessHistory: async (processNumber: string): Promise<Process[]> => {
-    const { data, error } = await supabase
-      .from('processes')
-      .select('*')
-      .eq('number', processNumber)
-      .order('entryDate', { ascending: true })
-      .order('createdAt', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching history:', error.message);
-      return [];
-    }
-
-    return (data || []).map((p: any) => ({
-      ...p,
-      category: p.category || '',
-      CGOF: p.CGOF || '',
-      number: p.number || '',
-      interested: p.interested || '',
-      subject: p.subject || '',
-      sector: p.sector || '',
-      observations: p.observations || '',
-      createdBy: p.createdBy || '',
-      updatedBy: p.updatedBy || '',
-      entryDate: p.entryDate || '',
-      processDate: p.processDate || null,
-      deadline: p.deadline || null
-    })) as Process[];
-  },
-
-  getLastProcessByNumber: async (number: string): Promise<Process | null> => {
-    const { data, error } = await supabase
-      .from('processes')
-      .select('*')
-      .eq('number', number)
-      .order('entryDate', { ascending: false })
-      .order('createdAt', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) return null;
-    if (!data) return null;
-
-    return {
-      ...data,
-      processDate: data.processDate || null,
-      deadline: data.deadline || null
-    } as Process;
+    return { data: data as Process[], count: count || 0 };
   },
 
   saveProcess: async (process: Process, performedBy: User): Promise<void> => {
-    const { data: existing } = await supabase.from('processes').select('createdAt').eq('id', process.id).maybeSingle();
-    const now = new Date().toISOString();
-    const isUpdate = !!existing;
-    
     const payload = {
-        ...process,
-        CGOF: normalizeCGOF(process.CGOF), // Garantir enum correto
-        updatedBy: performedBy.id,
-        updatedAt: now,
-        createdAt: isUpdate ? existing.createdAt : (process.createdAt || now)
+      ...process,
+      CGOF: normalizeCGOF(process.CGOF),
+      processDate: cleanDate(process.processDate),
+      deadline: cleanDate(process.deadline)
     };
-
-    if (payload.deadline === '') payload.deadline = null;
-    if (payload.processDate === '') payload.processDate = null;
-
     const { error } = await supabase.from('processes').upsert(payload);
     if (error) throw error;
-
-    await DbService.logAction(
-        isUpdate ? 'UPDATE' : 'CREATE', 
-        `Processo ${isUpdate ? 'atualizado' : 'criado'}: ${process.number}`, 
-        performedBy, 
-        process.id
-    );
+    await DbService.logAction(process.id ? 'UPDATE' : 'CREATE', `Processo salvo: ${process.number}`, performedBy, process.id);
   },
 
   updateProcesses: async (ids: string[], updates: Partial<Process>, performedBy: User): Promise<void> => {
-    const { error } = await supabase.from('processes').update({
-      ...updates,
-      updatedBy: performedBy.id,
-      updatedAt: new Date().toISOString()
-    }).in('id', ids);
+    const cleanedUpdates = { ...updates };
+    if ('processDate' in cleanedUpdates) cleanedUpdates.processDate = cleanDate(cleanedUpdates.processDate);
+    if ('deadline' in cleanedUpdates) cleanedUpdates.deadline = cleanDate(cleanedUpdates.deadline);
 
+    const { error } = await supabase.from('processes').update(cleanedUpdates).in('id', ids);
     if (error) throw error;
-    await DbService.logAction('UPDATE', `Atualização em lote: ${ids.length} processos`, performedBy);
+    await DbService.logAction('UPDATE', `Atualização em massa: ${ids.length} processos`, performedBy);
   },
 
   importProcesses: async (processes: Process[], performedBy: User): Promise<void> => {
+    const normalized = processes.map(p => ({
+      ...p,
+      CGOF: normalizeCGOF(p.CGOF),
+      processDate: cleanDate(p.processDate),
+      deadline: cleanDate(p.deadline)
+    }));
+    
     const BATCH_SIZE = 100;
-    try {
-      // Normalizar todos os CGOFs antes do insert para evitar erros de enum
-      const cleanedProcesses = processes.map(p => ({
-        ...p,
-        CGOF: normalizeCGOF(p.CGOF)
-      }));
-
-      for (let i = 0; i < cleanedProcesses.length; i += BATCH_SIZE) {
-        const chunk = cleanedProcesses.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
+        const chunk = normalized.slice(i, i + BATCH_SIZE);
         const { error } = await supabase.from('processes').insert(chunk);
         if (error) throw error;
-      }
-      await DbService.logAction('CREATE', `Importação em massa: ${cleanedProcesses.length} processos`, performedBy);
-    } catch (error: any) {
-      console.error('Erro fatal na importação:', error.message);
-      throw error;
     }
-  },
-
-  deleteProcess: async (processId: string, performedBy: User): Promise<void> => {
-    const { data: process } = await supabase.from('processes').select('number').eq('id', processId).single();
-    await supabase.from('processes').delete().eq('id', processId);
-    await DbService.logAction('DELETE', `Processo excluído: ${process?.number || processId}`, performedBy, processId);
-  },
-
-  deleteLastMovement: async (number: string, performedBy: User): Promise<void> => {
-    const last = await DbService.getLastProcessByNumber(number);
-    if (!last) throw new Error("Nenhuma movimentação encontrada.");
     
-    const { error } = await supabase.from('processes').delete().eq('id', last.id);
+    await DbService.logAction('CREATE', `Importação em massa: ${processes.length} processos`, performedBy);
+  },
+
+  deleteProcess: async (id: string, performedBy: User): Promise<void> => {
+    const { error } = await supabase.from('processes').delete().eq('id', id);
     if (error) throw error;
-    
-    await DbService.logAction('DELETE', `Última movimentação excluída: ${number}`, performedBy, last.id);
+    await DbService.logAction('DELETE', `Processo excluído (ID: ${id})`, performedBy, id);
   },
 
   deleteProcesses: async (ids: string[], performedBy: User): Promise<void> => {
     const { error } = await supabase.from('processes').delete().in('id', ids);
     if (error) throw error;
-    await DbService.logAction('DELETE', `Exclusão em lote: ${ids.length} processos`, performedBy);
+    await DbService.logAction('DELETE', `${ids.length} processos excluídos`, performedBy);
   },
 
+  deleteLastMovement: async (number: string, performedBy: User): Promise<void> => {
+    const { data, error: fetchError } = await supabase
+      .from('processes')
+      .select('id')
+      .eq('number', number)
+      .order('entryDate', { ascending: false })
+      .order('updatedAt', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!data) return;
+
+    const { error: deleteError } = await supabase.from('processes').delete().eq('id', data.id);
+    if (deleteError) throw deleteError;
+
+    await DbService.logAction('DELETE', `Última movimentação excluída para o processo: ${number}`, performedBy, data.id);
+  },
+
+  getProcessHistory: async (number: string): Promise<Process[]> => {
+    const { data, error } = await supabase
+      .from('processes')
+      .select('*')
+      .eq('number', number)
+      .order('entryDate', { ascending: false });
+    if (error) throw error;
+    return data as Process[];
+  },
+
+  getAllProcessesForDashboard: async (): Promise<{ data: Process[], count: number }> => {
+    // Busca um volume expressivo de dados para garantir que os cálculos do dashboard sejam precisos
+    const { data, count, error } = await supabase
+      .from('processes')
+      .select('*', { count: 'exact' })
+      .limit(30000); // Limite aumentado para cobrir bases grandes
+      
+    if (error) {
+      console.error('Erro ao buscar dados para dashboard:', error.message);
+      return { data: [], count: 0 };
+    }
+    return { data: data as Process[], count: count || 0 };
+  },
+
+  getUniqueValues: async (column: 'sector' | 'interested' | 'subject'): Promise<string[]> => {
+    const rpcMap = {
+      sector: 'distinct_setor',
+      interested: 'distinct_interessada',
+      subject: 'distinct_assunto'
+    };
+    const { data, error } = await supabase.rpc(rpcMap[column]);
+    if (error) {
+      console.error(`Error fetching unique ${column}:`, error.message);
+      return [];
+    }
+    return (data as any[]).map(item => item.value).filter(Boolean);
+  },
+
+  // --- LOGS ---
   getLogs: async (): Promise<Log[]> => {
-    const { data, error } = await supabase.from('logs').select('*').order('timestamp', { ascending: false }).limit(100);
-    if (error) return [];
+    const { data, error } = await supabase.from('logs').select('*').order('timestamp', { ascending: false }).limit(500);
+    if (error) {
+      console.error('Error fetching logs:', error.message);
+      return [];
+    }
     return data as Log[];
   },
 
   logAction: async (action: Log['action'], description: string, user: User, targetId?: string) => {
     await supabase.from('logs').insert({
+      id: crypto.randomUUID(),
       action,
       description,
       userId: user.id,
@@ -473,28 +408,17 @@ export const DbService = {
     });
   },
 
-  checkAndSeedData: async (adminUser: User) => {
-    const { count } = await supabase
-      .from('processes')
-      .select('*', { count: 'exact', head: true })
-      .limit(1);
-    
+  checkAndSeedData: async (user: User) => {
+    const { count } = await supabase.from('processes').select('*', { count: 'exact', head: true }).limit(1);
     if (count === 0) {
-      const rawData = getInitialAssessoriaData();
-      const processes: Process[] = rawData.map(p => ({
+      const initialDataRaw = getInitialAssessoriaData();
+      const initialData = initialDataRaw.map(p => ({
         ...p,
         id: crypto.randomUUID(),
-        category: 'Assessoria',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }));
-
-      const chunkSize = 50;
-      for (let i = 0; i < processes.length; i += chunkSize) {
-        const chunk = processes.slice(i, i + chunkSize);
-        await supabase.from('processes').insert(chunk);
-      }
-      await DbService.logAction('CREATE', `Seed automático: ${processes.length} processos`, adminUser);
+      await DbService.importProcesses(initialData as Process[], user);
     }
   }
 };

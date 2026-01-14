@@ -3,12 +3,12 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useApp } from '../context/AppContext';
 import { Process, CGOF_OPTIONS, ProcessQueryParams, UserRole } from '../types';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
   Search, Plus, Edit, Trash2, Download, AlertTriangle, 
   Flag, X, CheckSquare, Square, Filter, ChevronLeft, ChevronRight, Calendar, Activity, ChevronDown, Check, Loader2, Lock, AlertCircle, Upload, FileText,
-  MapPinOff, CalendarOff
+  MapPinOff, CalendarOff, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { DbService } from '../services/dbService';
 
@@ -68,17 +68,14 @@ const Combobox = ({ label, name, options, defaultValue = '', required = false, p
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Sync state with defaultValue when it changes externally
   useEffect(() => { 
     setInputValue(defaultValue || ''); 
   }, [defaultValue]);
 
-  // Update suggestions whenever options or input value changes
   useEffect(() => {
     const lower = inputValue.toLowerCase().trim();
     if (lower) {
       const filtered = options.filter(opt => opt && opt.toLowerCase().includes(lower));
-      // Se a filtragem for maior que 0, mostra o que encontrou, caso contrário mostra opções iniciais
       setFilteredOptions(filtered.slice(0, 15));
     } else {
       setFilteredOptions(options.slice(0, 15));
@@ -124,7 +121,6 @@ const Combobox = ({ label, name, options, defaultValue = '', required = false, p
               key={`${name}-opt-${idx}`} 
               className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer text-slate-700 flex items-center justify-between border-b border-slate-50 last:border-0"
               onMouseDown={(e) => {
-                // Use onMouseDown instead of onClick to prevent focus loss before selection
                 e.preventDefault();
                 handleSelectOption(opt);
               }}
@@ -179,6 +175,8 @@ export const ProcessManager = () => {
   const [selectedProcessHistory, setSelectedProcessHistory] = useState<Process[]>([]);
   const [selectedProcessNumber, setSelectedProcessNumber] = useState<string>('');
 
+  // Estados de Filtros e UI
+  const [tableFontSize, setTableFontSize] = useState(() => getInitialState('tableFontSize', 10.5));
   const [searchTerm, setSearchTerm] = useState(() => getInitialState('searchTerm', ''));
   const [filterCgof, setFilterCgof] = useState(() => getInitialState('filterCgof', ''));
   const [filterSector, setFilterSector] = useState(() => getInitialState('filterSector', ''));
@@ -200,10 +198,10 @@ export const ProcessManager = () => {
   useEffect(() => {
     const stateToSave = {
       searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd,
-      filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage
+      filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage, tableFontSize
     };
     localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(stateToSave));
-  }, [searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage]);
+  }, [searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage, tableFontSize]);
 
   useEffect(() => {
     const handler = setTimeout(() => { setDebouncedSearchTerm(searchTerm); }, 500);
@@ -298,7 +296,6 @@ export const ProcessManager = () => {
             DbService.getUniqueValues('subject')
         ]);
         
-        // Coletar valores locais como fallback caso o RPC falhe ou não esteja configurado
         const localSectors = Array.from(new Set(processes.map(p => p.sector).filter(Boolean))).sort();
         const localInterested = Array.from(new Set(processes.map(p => p.interested).filter(Boolean))).sort();
         const localSubjects = Array.from(new Set(processes.map(p => p.subject).filter(Boolean))).sort();
@@ -504,6 +501,10 @@ export const ProcessManager = () => {
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
+  const changeFontSize = (delta: number) => {
+      setTableFontSize(prev => Math.min(Math.max(prev + delta, 9), 16));
+  };
+
   return (
     <div className="space-y-4 relative min-h-[calc(100vh-100px)] flex flex-col">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
@@ -511,7 +512,14 @@ export const ProcessManager = () => {
           <h2 className="text-2xl font-bold text-slate-800">Fluxo de Processos</h2>
           <p className="text-slate-500 text-sm">Controle de entradas, localizações atuais, saídas e retornos</p>
         </div>
-        <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+        <div className="flex flex-wrap gap-2 w-full xl:w-auto items-center">
+            {/* ZOOM CONTROLS */}
+           <div className="flex items-center gap-1 bg-white border border-slate-300 rounded p-1 shadow-sm mr-2">
+                <button onClick={() => changeFontSize(-0.5)} className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-600" title="Diminuir Fonte"><ZoomOut size={16}/></button>
+                <span className="text-[10px] font-bold text-slate-400 px-1 w-8 text-center">{tableFontSize.toFixed(1)}</span>
+                <button onClick={() => changeFontSize(0.5)} className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-600" title="Aumentar Fonte"><ZoomIn size={16}/></button>
+           </div>
+
            {isAdmin && (
              <>
                <button onClick={() => setIsImportModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded text-sm hover:bg-slate-50 transition shadow-sm font-medium text-slate-700">
@@ -582,8 +590,8 @@ export const ProcessManager = () => {
                 <th className="px-2 py-3">Número</th>
                 <th className="px-2 py-3">Entrada</th>
                 <th className="px-2 py-3">Origem</th>
-                <th className="px-3 py-3 min-w-[130px]">Interessada</th>
-                <th className="px-3 py-3 min-w-[150px]">Assunto</th>
+                <th className="px-3 py-3 min-w-[150px]">Interessada</th>
+                <th className="px-3 py-3 min-w-[180px]">Assunto</th>
                 <th className="px-2 py-3">Localização</th>
                 <th className="px-2 py-3">Saída</th>
                 <th className="px-2 py-3">Retorno</th>
@@ -593,6 +601,7 @@ export const ProcessManager = () => {
             <tbody className="divide-y divide-slate-100">
               {uniqueProcesses.map(process => {
                 const status = getDeadlineStatus(process.deadline);
+                const dynamicRowStyle = { fontSize: `${tableFontSize}px` };
                 return (
                   <tr key={process.id} className={`group hover:bg-blue-50/30 transition-colors ${selectedIds.has(process.id) ? 'bg-blue-50/80' : ''}`}>
                     <td className="px-4 py-2">
@@ -600,26 +609,40 @@ export const ProcessManager = () => {
                          {selectedIds.has(process.id) ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} />}
                       </button>
                     </td>
-                    <td className="px-2 py-2 font-mono text-slate-900 whitespace-nowrap align-top font-bold text-[10.5px]">
+                    <td style={dynamicRowStyle} className="px-2 py-2 font-mono text-slate-900 whitespace-nowrap align-top font-bold">
                         <button onClick={() => handleOpenHistory(process)} className="hover:underline text-blue-700">{process.number}</button>
                     </td>
-                    <td className="px-2 py-2 text-[10.5px] text-slate-600 align-top font-medium whitespace-nowrap">{toDisplayDate(process.entryDate)}</td>
-                    <td className="px-2 py-2 text-[10.5px] font-semibold text-slate-700 align-top">{process.CGOF || '-'}</td>
-                    <td className="px-3 py-2 text-[10.5px] text-slate-700 align-top leading-tight">{process.interested}</td>
-                    <td className="px-3 py-2 text-[10.5px] text-slate-600 align-top leading-tight">{process.subject}</td>
-                    <td className="px-2 py-2 text-[10.5px] text-slate-500 align-top">
-                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shadow-sm block w-fit max-w-[100px] truncate" title={process.sector}>{process.sector || <span className="text-slate-300 italic">Vazio</span>}</span>
+                    <td style={dynamicRowStyle} className="px-2 py-2 text-slate-600 align-top font-medium whitespace-nowrap">{toDisplayDate(process.entryDate)}</td>
+                    <td style={dynamicRowStyle} className="px-2 py-2 font-semibold text-slate-700 align-top">{process.CGOF || '-'}</td>
+                    {/* COLUNA INTERESSADA: TOOLTIP E QUEBRA DE LINHA */}
+                    <td 
+                      style={dynamicRowStyle} 
+                      className="px-3 py-2 text-slate-700 align-top leading-tight whitespace-normal break-words"
+                      title={process.interested}
+                    >
+                        {process.interested}
                     </td>
-                    <td className="px-2 py-2 text-[10.5px] text-slate-600 align-top font-medium italic whitespace-nowrap">
+                    {/* COLUNA ASSUNTO: TOOLTIP E QUEBRA DE LINHA */}
+                    <td 
+                      style={dynamicRowStyle} 
+                      className="px-3 py-2 text-slate-600 align-top leading-tight whitespace-normal break-words"
+                      title={process.subject}
+                    >
+                        {process.subject}
+                    </td>
+                    <td style={dynamicRowStyle} className="px-2 py-2 text-slate-500 align-top">
+                        <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shadow-sm block w-fit max-w-[120px] truncate" title={process.sector}>{process.sector || <span className="text-slate-300 italic">Vazio</span>}</span>
+                    </td>
+                    <td style={dynamicRowStyle} className="px-2 py-2 text-slate-600 align-top font-medium italic whitespace-nowrap">
                         {process.processDate ? toDisplayDate(process.processDate) : <span className="text-slate-300">Em curso</span>}
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap align-top">
+                    <td style={dynamicRowStyle} className="px-2 py-2 whitespace-nowrap align-top">
                        {process.deadline ? (
                           <div className="flex flex-col items-start">
-                            <span className="text-[10.5px] text-slate-700 font-bold">{toDisplayDate(process.deadline)}</span>
+                            <span className="text-slate-700 font-bold">{toDisplayDate(process.deadline)}</span>
                             <span className={`text-[8.5px] uppercase font-bold px-1.5 rounded border mt-0.5 ${status.color}`}>{status.label}</span>
                           </div>
-                       ) : <span className="text-slate-300 text-[10.5px]">-</span>}
+                       ) : <span className="text-slate-300">-</span>}
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap align-top">
                       <div className="flex items-center justify-end gap-1">

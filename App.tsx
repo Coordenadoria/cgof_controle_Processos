@@ -3,7 +3,6 @@ import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import { Layout } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
 import { ProcessManager } from './pages/ProcessManager';
 import { UserManagement } from './pages/UserManagement';
 import { Logs } from './pages/Logs';
@@ -19,7 +18,7 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children?: React.Reac
   }
 
   if (adminOnly && currentUser.role !== UserRole.ADMIN) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/processos" replace />;
   }
 
   return <Layout>{children}</Layout>;
@@ -30,11 +29,11 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/login" element={currentUser ? <Navigate to="/" /> : <Login />} />
+      <Route path="/login" element={currentUser ? <Navigate to="/processos" /> : <Login />} />
       
       <Route path="/" element={
         <ProtectedRoute>
-          <Dashboard />
+          <Navigate to="/processos" replace />
         </ProtectedRoute>
       } />
       
@@ -62,7 +61,7 @@ const AppRoutes = () => {
         </ProtectedRoute>
       } />
 
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route path="*" element={<Navigate to="/processos" />} />
     </Routes>
   );
 };
