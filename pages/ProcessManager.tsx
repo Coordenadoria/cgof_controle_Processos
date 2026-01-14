@@ -63,19 +63,23 @@ interface ComboboxProps {
 }
 
 const Combobox = ({ label, name, options, defaultValue = '', required = false, placeholder = '' }: ComboboxProps) => {
-  const [inputValue, setInputValue] = useState(defaultValue);
+  const [inputValue, setInputValue] = useState(defaultValue || '');
   const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setInputValue(defaultValue || ''); }, [defaultValue]);
+  // Sync state with defaultValue when it changes externally
+  useEffect(() => { 
+    setInputValue(defaultValue || ''); 
+  }, [defaultValue]);
 
+  // Update suggestions whenever options or input value changes
   useEffect(() => {
-    if (inputValue) {
-      const lower = inputValue.toLowerCase();
-      const filtered = options.filter(opt => opt.toLowerCase().includes(lower));
-      // Se não houver filtro, mostramos todos (até 15)
-      setFilteredOptions(filtered.length > 0 ? filtered.slice(0, 15) : options.slice(0, 15));
+    const lower = inputValue.toLowerCase().trim();
+    if (lower) {
+      const filtered = options.filter(opt => opt && opt.toLowerCase().includes(lower));
+      // Se a filtragem for maior que 0, mostra o que encontrou, caso contrário mostra opções iniciais
+      setFilteredOptions(filtered.slice(0, 15));
     } else {
       setFilteredOptions(options.slice(0, 15));
     }
@@ -91,12 +95,19 @@ const Combobox = ({ label, name, options, defaultValue = '', required = false, p
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [wrapperRef]);
 
+  const handleSelectOption = (opt: string) => {
+    setInputValue(opt);
+    setShowSuggestions(false);
+  };
+
   return (
     <div className="relative" ref={wrapperRef}>
       <label className="block text-sm font-bold text-slate-700 mb-1">{label}</label>
       <div className="relative">
         <input 
-          type="text" name={name} value={inputValue}
+          type="text" 
+          name={name} 
+          value={inputValue}
           onChange={(e) => { setInputValue(e.target.value); setShowSuggestions(true); }}
           onFocus={() => setShowSuggestions(true)}
           className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all"
@@ -107,10 +118,17 @@ const Combobox = ({ label, name, options, defaultValue = '', required = false, p
         </div>
       </div>
       {showSuggestions && filteredOptions.length > 0 && (
-        <ul className="absolute z-[100] w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+        <ul className="absolute z-[100] w-full bg-white border border-slate-200 rounded-lg shadow-xl mt-1 max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-150 border-t-0">
           {filteredOptions.map((opt, idx) => (
-            <li key={idx} className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer text-slate-700 flex items-center justify-between"
-              onClick={() => { setInputValue(opt); setShowSuggestions(false); }}>
+            <li 
+              key={`${name}-opt-${idx}`} 
+              className="px-3 py-2 text-sm hover:bg-blue-50 cursor-pointer text-slate-700 flex items-center justify-between border-b border-slate-50 last:border-0"
+              onMouseDown={(e) => {
+                // Use onMouseDown instead of onClick to prevent focus loss before selection
+                e.preventDefault();
+                handleSelectOption(opt);
+              }}
+            >
               {opt}
               {inputValue === opt && <Check size={14} className="text-blue-500"/>}
             </li>
@@ -270,6 +288,9 @@ export const ProcessManager = () => {
 
   const handleOpenModal = async (process?: Process) => {
     setLoadingEdit(true);
+    setIsModalOpen(true);
+    setEditingProcess(process || null);
+    
     try {
         const [setoresRpc, interessadasRpc, assuntosRpc] = await Promise.all([
             DbService.getUniqueValues('sector'),
@@ -282,19 +303,14 @@ export const ProcessManager = () => {
         const localInterested = Array.from(new Set(processes.map(p => p.interested).filter(Boolean))).sort();
         const localSubjects = Array.from(new Set(processes.map(p => p.subject).filter(Boolean))).sort();
 
-        setSectorOptions(setoresRpc.length > 0 ? setoresRpc : localSectors);
+        setSectorOptions(setoresRpc.length > 0 ? setoresRpc : (localSectors.length > 0 ? localSectors : ['SES-GS-ATG8', 'GS/RECEBIMENTO']));
         setInterestedOptions(interessadasRpc.length > 0 ? interessadasRpc : localInterested);
         setSubjectOptions(assuntosRpc.length > 0 ? assuntosRpc : localSubjects);
     } catch (error) { 
         console.error("Erro ao carregar listas de sugestão:", error); 
+    } finally {
+        setLoadingEdit(false);
     }
-
-    if (process) {
-      setEditingProcess(process);
-    } else { setEditingProcess(null); }
-    
-    setLoadingEdit(false);
-    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => { setIsModalOpen(false); setEditingProcess(null); };
@@ -741,7 +757,9 @@ export const ProcessManager = () => {
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
-                                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Localização</span>
+                                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                                                {idx === selectedProcessHistory.length - 1 ? 'Localização Atual' : 'Movimentação'}
+                                            </span>
                                             <h4 className="font-bold text-slate-800 text-sm">{item.sector || 'Não Informado'}</h4>
                                         </div>
                                         <div className="flex items-start gap-4">
