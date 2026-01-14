@@ -164,6 +164,7 @@ export const ProcessManager = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [deleteType, setDeleteType] = useState<'movement' | 'process'>('movement');
+  const [selectedMovementToDelete, setSelectedMovementToDelete] = useState<Process | null>(null);
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   
@@ -395,12 +396,22 @@ export const ProcessManager = () => {
         if (!isValid) { setPasswordError('Senha incorreta.'); setIsVerifyingPassword(false); return; }
         
         if (deleteType === 'movement') {
-          // Excluir última movimentação
-          await deleteLastMovement(selectedProcessNumber);
-          setIsPasswordModalOpen(false); alert('Movimentação excluída com sucesso!');
-          const updatedHistory = await fetchProcessHistory(selectedProcessNumber);
-          setSelectedProcessHistory(updatedHistory); refreshCurrentList();
-          if (updatedHistory.length === 0) setIsHistoryModalOpen(false);
+          // Excluir movimentação específica selecionada
+          if (selectedMovementToDelete) {
+            // Deletar a movimentação pelo ID
+            await DbService.deleteProcess(selectedMovementToDelete.id, currentUser);
+            
+            // Atualizar o histórico removendo a movimentação deletada
+            const updatedHistory = await fetchProcessHistory(selectedProcessNumber);
+            setSelectedProcessHistory(updatedHistory);
+            
+            setIsPasswordModalOpen(false); 
+            alert('Movimentação excluída com sucesso!');
+            refreshCurrentList();
+            if (updatedHistory.length === 0) setIsHistoryModalOpen(false);
+            setSelectedMovementToDelete(null);
+            setConfirmPassword('');
+          }
         } else if (deleteType === 'process') {
           // Excluir fluxo inteiro (processo)
           const processToDelete = processes.find(p => p.number === selectedProcessNumber);
@@ -861,6 +872,7 @@ export const ProcessManager = () => {
                                                     onClick={() => {
                                                       if (confirm('Tem certeza que deseja excluir esta movimentação?')) {
                                                         setSelectedProcessNumber(item.number);
+                                                        setSelectedMovementToDelete(item);
                                                         setDeleteType('movement');
                                                         setIsPasswordModalOpen(true);
                                                       }
