@@ -104,7 +104,7 @@ export const DbService = {
   // --- LOGS ---
   getLogs: async (): Promise<Log[]> => {
     const logs = await db.logs.toArray();
-    return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return logs.sort((a: Log, b: Log) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   },
 
   logAction: async (action: Log['action'], description: string, user: User, targetId?: string) => {
@@ -127,7 +127,7 @@ export const DbService = {
     // Fallback: check by name if email failed (as per original logic allowing login/email)
     if (!user) {
       const allUsers = await db.users.toArray();
-      user = allUsers.find(u => u.name === email);
+      user = allUsers.find((u: User) => u.name === email);
     }
 
     if (user && user.password === pass && user.active) {

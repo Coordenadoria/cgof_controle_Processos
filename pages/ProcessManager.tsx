@@ -224,7 +224,7 @@ export const ProcessManager = () => {
     },
     sortBy: {
       field: sortBy,
-      order: (sortBy === 'deadline' || sortBy === 'entryDate') ? 'desc' : 'asc'
+      order: ((sortBy === 'deadline' || sortBy === 'entryDate') ? 'desc' : 'asc') as 'asc' | 'desc'
     }
   }), [currentPage, itemsPerPage, debouncedSearchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy]);
 
