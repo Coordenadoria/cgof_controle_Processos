@@ -150,7 +150,7 @@ const getInitialState = <T,>(key: string, defaultValue: T): T => {
 export const ProcessManager = () => {
   const { 
     processes, totalProcessesCount, fetchProcesses, fetchProcessHistory, currentUser,
-    saveProcess, deleteLastMovement, loading, importProcesses
+    saveProcess, deleteLastMovement, deleteProcess, loading, importProcesses
   } = useApp();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -163,6 +163,7 @@ export const ProcessManager = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [deleteType, setDeleteType] = useState<'movement' | 'process'>('movement');
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   
@@ -373,11 +374,25 @@ export const ProcessManager = () => {
     try {
         const isValid = await DbService.verifyPassword(currentUser.id, confirmPassword);
         if (!isValid) { setPasswordError('Senha incorreta.'); setIsVerifyingPassword(false); return; }
-        await deleteLastMovement(selectedProcessNumber);
-        setIsPasswordModalOpen(false); alert('Excluído com sucesso!');
-        const updatedHistory = await fetchProcessHistory(selectedProcessNumber);
-        setSelectedProcessHistory(updatedHistory); refreshCurrentList();
-        if (updatedHistory.length === 0) setIsHistoryModalOpen(false);
+        
+        if (deleteType === 'movement') {
+          // Excluir última movimentação
+          await deleteLastMovement(selectedProcessNumber);
+          setIsPasswordModalOpen(false); alert('Movimentação excluída com sucesso!');
+          const updatedHistory = await fetchProcessHistory(selectedProcessNumber);
+          setSelectedProcessHistory(updatedHistory); refreshCurrentList();
+          if (updatedHistory.length === 0) setIsHistoryModalOpen(false);
+        } else if (deleteType === 'process') {
+          // Excluir fluxo inteiro (processo)
+          const processToDelete = processes.find(p => p.number === selectedProcessNumber);
+          if (processToDelete) {
+            await deleteProcess(processToDelete.id);
+            setIsPasswordModalOpen(false); 
+            setIsHistoryModalOpen(false);
+            alert('Fluxo excluído com sucesso!');
+            refreshCurrentList();
+          }
+        }
     } catch (err: any) { 
         setPasswordError('Erro ao excluir: ' + (err?.message || 'Tente novamente.')); 
     }
@@ -648,7 +663,7 @@ export const ProcessManager = () => {
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => handleOpenHistory(process)} className="p-1 text-slate-600 hover:text-blue-600 rounded" title="Ver Histórico"><Activity size={16} /></button>
                         <button onClick={() => handleOpenModal(process)} className="p-1 text-slate-600 hover:text-blue-600 rounded" title="Editar"><Edit size={16} /></button>
-                        <button onClick={() => { setSelectedProcessNumber(process.number); setIsPasswordModalOpen(true); }} className="p-1 text-slate-400 hover:text-red-600 rounded" title="Excluir"><Trash2 size={16} /></button>
+                        <button onClick={() => { setSelectedProcessNumber(process.number); setDeleteType('movement'); setIsPasswordModalOpen(true); }} className="p-1 text-slate-400 hover:text-red-600 rounded" title="Excluir última movimentação"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -740,11 +755,18 @@ export const ProcessManager = () => {
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform">
                 <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-3">
                     <Trash2 className="text-red-600" size={24} />
-                    <h3 className="font-bold text-red-900">Excluir Movimento</h3>
+                    <h3 className="font-bold text-red-900">
+                      {deleteType === 'movement' ? 'Excluir Movimento' : 'Excluir Fluxo Completo'}
+                    </h3>
                     <button onClick={() => setIsPasswordModalOpen(false)} className="ml-auto text-red-400 hover:text-red-700"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleConfirmPasswordDelete} className="p-6 space-y-4">
-                    <p className="text-slate-600 text-sm">Confirme sua senha para excluir a última movimentação de <span className="font-bold">{selectedProcessNumber}</span>:</p>
+                    <p className="text-slate-600 text-sm">
+                      {deleteType === 'movement' 
+                        ? `Confirme sua senha para excluir a última movimentação de ${selectedProcessNumber}:`
+                        : `Confirme sua senha para excluir o fluxo completo ${selectedProcessNumber}. Esta ação não pode ser desfeita!`
+                      }
+                    </p>
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input ref={passwordInputRef} type="password" value={confirmPassword} onChange={(e) => {setConfirmPassword(e.target.value); setPasswordError('');}} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-200 outline-none" placeholder="Senha de acesso" required />
@@ -767,7 +789,22 @@ export const ProcessManager = () => {
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Activity size={20} className="text-blue-600"/>Histórico do Fluxo</h3>
                 <p className="text-xs font-mono text-slate-600 mt-1">Número: {selectedProcessNumber}</p>
               </div>
-              <button onClick={() => setIsHistoryModalOpen(false)} className="p-1 hover:bg-slate-200 rounded transition-colors"><X size={24} /></button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    if (confirm('Tem certeza que deseja excluir este fluxo completamente? Esta ação não pode ser desfeita.')) {
+                      setDeleteType('process');
+                      setIsHistoryModalOpen(false);
+                      setIsPasswordModalOpen(true);
+                    }
+                  }} 
+                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" 
+                  title="Excluir fluxo"
+                >
+                  <Trash2 size={20} />
+                </button>
+                <button onClick={() => setIsHistoryModalOpen(false)} className="p-1 hover:bg-slate-200 rounded transition-colors"><X size={24} /></button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
                 {historyLoading ? (
