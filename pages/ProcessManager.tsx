@@ -313,6 +313,25 @@ export const ProcessManager = () => {
 
   const handleCloseModal = () => { setIsModalOpen(false); setEditingProcess(null); };
 
+  // Função para determinar qual é a Localização Atual baseada nas datas mais recentes
+  const getCurrentLocationId = (history: Process[]): string | null => {
+    if (history.length === 0) return null;
+    
+    // Encontrar o item com a data mais recente (processDate se houver, senão entryDate)
+    let currentItem: Process | null = null;
+    let mostRecentDate: Date | null = null;
+    
+    for (const item of history) {
+      const dateToCompare = item.processDate ? new Date(item.processDate) : new Date(item.entryDate);
+      if (!mostRecentDate || dateToCompare > mostRecentDate) {
+        mostRecentDate = dateToCompare;
+        currentItem = item;
+      }
+    }
+    
+    return currentItem?.id || null;
+  };
+
   const handleOpenHistory = async (process: Process) => {
     setSelectedProcessNumber(process.number);
     setIsHistoryModalOpen(true);
@@ -811,14 +830,17 @@ export const ProcessManager = () => {
                     <div className="flex flex-col items-center h-48 justify-center gap-3"><Loader2 size={32} className="animate-spin text-blue-500" /></div>
                 ) : (
                     <div className="relative border-l-2 border-blue-100 ml-4 space-y-6">
-                        {selectedProcessHistory.map((item, idx) => (
+                        {selectedProcessHistory.map((item) => {
+                            const currentLocationId = getCurrentLocationId(selectedProcessHistory);
+                            const isCurrentLocation = item.id === currentLocationId;
+                            return (
                             <div key={item.id} className="relative pl-8">
-                                <div className={`absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 ${idx === selectedProcessHistory.length - 1 ? 'bg-blue-600 border-blue-600' : 'bg-white border-blue-200'}`}></div>
+                                <div className={`absolute -left-[9px] top-1.5 w-4 h-4 rounded-full border-2 ${isCurrentLocation ? 'bg-blue-600 border-blue-600' : 'bg-white border-blue-200'}`}></div>
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
                                     <div className="flex justify-between items-start mb-2">
                                         <div>
                                             <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                                                {idx === selectedProcessHistory.length - 1 ? 'Localização Atual' : 'Movimentação'}
+                                                {isCurrentLocation ? 'Localização Atual' : 'Movimentação'}
                                             </span>
                                             <h4 className="font-bold text-slate-800 text-sm">{item.sector || 'Não Informado'}</h4>
                                         </div>
@@ -872,7 +894,7 @@ export const ProcessManager = () => {
                                     )}
                                 </div>
                             </div>
-                        ))}
+                        );})}
                     </div>
                 )}
             </div>
