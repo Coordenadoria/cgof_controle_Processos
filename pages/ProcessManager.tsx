@@ -835,6 +835,19 @@ export const ProcessManager = () => {
                                                 >
                                                     <Edit size={16} />
                                                 </button>
+                                                <button 
+                                                    onClick={() => {
+                                                      if (confirm('Tem certeza que deseja excluir esta movimentação?')) {
+                                                        setSelectedProcessNumber(item.number);
+                                                        setDeleteType('movement');
+                                                        setIsPasswordModalOpen(true);
+                                                      }
+                                                    }} 
+                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                    title="Excluir esta movimentação"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
