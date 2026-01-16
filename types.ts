@@ -37,6 +37,7 @@ export interface Process {
   urgent: boolean;
   deadline: string | null; // ISO Date or null
   observations?: string;
+  processLink?: string; // Link direto do processo
   
   createdBy: string; // User ID
   updatedBy: string;

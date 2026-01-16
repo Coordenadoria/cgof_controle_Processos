@@ -393,6 +393,7 @@ export const ProcessManager = () => {
       sector: formData.get('sector') as string,
       processDate, urgent: formData.get('urgent') === 'on',
       deadline, observations: formData.get('observations') as string,
+      processLink: formData.get('processLink') as string,
       createdBy: editingProcess?.createdBy || currentUser?.id || 'system',
       createdAt: editingProcess?.createdAt || now,
       updatedBy: currentUser?.id || 'system',
@@ -511,6 +512,7 @@ export const ProcessManager = () => {
             deadline: parseExcelDate(retornoRaw),
             urgent: String(getVal(['Urgente', 'Prioridade', 'Urgência']) || '').toLowerCase().startsWith('s'),
             observations: String(getVal(['Observações', 'Obs', 'Anotação']) || '').trim(),
+            processLink: String(getVal(['Link', 'URL', 'Link do Processo']) || '').trim(),
             createdBy: currentUser.id,
             updatedBy: currentUser.id,
             createdAt: now,
@@ -545,7 +547,8 @@ export const ProcessManager = () => {
       'saida': toDisplayDate(p.processDate), 
       'Urgente': p.urgent ? 'Sim' : 'Não',
       'Retorno': toDisplayDate(p.deadline), 
-      'Status': getDeadlineStatus(p.deadline).label
+      'Status': getDeadlineStatus(p.deadline).label,
+      'Link': p.processLink || ''
     })));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Processos");
@@ -1044,6 +1047,10 @@ export const ProcessManager = () => {
                    <input name="urgent" type="checkbox" id="urgent-check" defaultChecked={editingProcess?.urgent} className="w-4 h-4 text-red-600 focus:ring-red-200" />
                    <label htmlFor="urgent-check" className="text-sm font-bold text-red-700 flex items-center gap-1 cursor-pointer"><Flag size={14} fill="currentColor" /> Urgente</label>
                 </div>
+              <div>
+                <label className="block text-sm font-bold mb-1 text-slate-700">Link do Processo</label>
+                <input name="processLink" type="url" defaultValue={editingProcess?.processLink || ''} className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100" placeholder="https://exemplo.com/processo" />
+              </div>
               <div>
                 <label className="block text-sm font-bold mb-1 text-slate-700">Observações</label>
                 <textarea name="observations" rows={3} defaultValue={editingProcess?.observations} className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100" placeholder="Informações adicionais..."></textarea>
