@@ -188,7 +188,8 @@ export const ProcessManager = () => {
   const [filterOverdue, setFilterOverdue] = useState(() => getInitialState('filterOverdue', false));
   const [filterEmptySector, setFilterEmptySector] = useState(() => getInitialState('filterEmptySector', false));
   const [filterEmptyExitDate, setFilterEmptyExitDate] = useState(() => getInitialState('filterEmptyExitDate', false));
-  const [sortBy, setSortBy] = useState<'deadline' | 'updatedAt' | 'number' | 'entryDate'>(() => getInitialState('sortBy', 'entryDate'));
+  const [sortBy, setSortBy] = useState<'deadline' | 'updatedAt' | 'number' | 'entryDate'>(() => getInitialState('sortBy', 'updatedAt'));
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => getInitialState('sortOrder', 'desc'));
   const [itemsPerPage, setItemsPerPage] = useState(() => getInitialState('itemsPerPage', 20));
   const [currentPage, setCurrentPage] = useState(() => getInitialState('currentPage', 1));
 
@@ -200,10 +201,10 @@ export const ProcessManager = () => {
   useEffect(() => {
     const stateToSave = {
       searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd,
-      filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage, tableFontSize
+      filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, sortOrder, itemsPerPage, currentPage, tableFontSize
     };
     localStorage.setItem(STORAGE_KEY_FILTERS, JSON.stringify(stateToSave));
-  }, [searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, itemsPerPage, currentPage, tableFontSize]);
+  }, [searchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, sortOrder, itemsPerPage, currentPage, tableFontSize]);
 
   useEffect(() => {
     const handler = setTimeout(() => { setDebouncedSearchTerm(searchTerm); }, 500);
@@ -226,9 +227,9 @@ export const ProcessManager = () => {
     },
     sortBy: {
       field: sortBy,
-      order: ((sortBy === 'deadline' || sortBy === 'entryDate') ? 'desc' : 'asc') as 'asc' | 'desc'
+      order: sortOrder
     }
-  }), [currentPage, itemsPerPage, debouncedSearchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy]);
+  }), [currentPage, itemsPerPage, debouncedSearchTerm, filterCgof, filterSector, filterEntryDateStart, filterEntryDateEnd, filterUrgent, filterOverdue, filterEmptySector, filterEmptyExitDate, sortBy, sortOrder]);
 
   const refreshCurrentList = useCallback(() => {
     fetchProcesses(getCurrentParams());
@@ -239,6 +240,31 @@ export const ProcessManager = () => {
   const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
       setter(value);
       setCurrentPage(1);
+  };
+
+  const handleColumnSort = (field: 'number' | 'entryDate' | 'CGOF' | 'interested' | 'subject' | 'sector' | 'processDate' | 'deadline') => {
+    let sortField: 'deadline' | 'updatedAt' | 'number' | 'entryDate' = 'entryDate';
+    
+    if (field === 'number') sortField = 'number';
+    else if (field === 'entryDate') sortField = 'entryDate';
+    else if (field === 'deadline') sortField = 'deadline';
+    else if (field === 'processDate') sortField = 'updatedAt';
+    else if (field === 'CGOF' || field === 'interested' || field === 'subject' || field === 'sector') {
+      sortField = 'updatedAt';
+    }
+    
+    if (sortBy === sortField) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(sortField);
+      setSortOrder('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIndicator = (field: 'deadline' | 'updatedAt' | 'number' | 'entryDate') => {
+    if (sortBy !== field) return null;
+    return sortOrder === 'asc' ? '↑' : '↓';
   };
 
   const uniqueProcesses = useMemo(() => {
@@ -632,14 +658,54 @@ export const ProcessManager = () => {
                     {selectedIds.size > 0 && selectedIds.size === uniqueProcesses.length ? <CheckSquare size={16} /> : <Square size={16} />}
                   </button>
                 </th>
-                <th className="px-2 py-3">Número</th>
-                <th className="px-2 py-3">Entrada</th>
-                <th className="px-2 py-3">Origem</th>
-                <th className="px-3 py-3 min-w-[150px]">Interessada</th>
-                <th className="px-3 py-3 min-w-[180px]">Assunto</th>
-                <th className="px-2 py-3">Localização</th>
-                <th className="px-2 py-3">Saída</th>
-                <th className="px-2 py-3">Retorno</th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('number')}>
+                  <div className="flex items-center gap-1">
+                    Número
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('number')}</span>
+                  </div>
+                </th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('entryDate')}>
+                  <div className="flex items-center gap-1">
+                    Entrada
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('entryDate')}</span>
+                  </div>
+                </th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('CGOF')}>
+                  <div className="flex items-center gap-1">
+                    Origem
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('updatedAt')}</span>
+                  </div>
+                </th>
+                <th className="px-3 py-3 min-w-[150px] cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('interested')}>
+                  <div className="flex items-center gap-1">
+                    Interessada
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('updatedAt')}</span>
+                  </div>
+                </th>
+                <th className="px-3 py-3 min-w-[180px] cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('subject')}>
+                  <div className="flex items-center gap-1">
+                    Assunto
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('updatedAt')}</span>
+                  </div>
+                </th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('sector')}>
+                  <div className="flex items-center gap-1">
+                    Localização
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('updatedAt')}</span>
+                  </div>
+                </th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('processDate')}>
+                  <div className="flex items-center gap-1">
+                    Saída
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('updatedAt')}</span>
+                  </div>
+                </th>
+                <th className="px-2 py-3 cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleColumnSort('deadline')}>
+                  <div className="flex items-center gap-1">
+                    Retorno
+                    <span className="text-blue-600 font-bold text-xs">{getSortIndicator('deadline')}</span>
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
