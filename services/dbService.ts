@@ -62,6 +62,14 @@ const cleanDate = (date: string | null | undefined): string | null => {
   return date;
 };
 
+// Função para mapear process_link (snake_case) para processLink (camelCase)
+const mapProcessFromDB = (dbProcess: any): Process => {
+  return {
+    ...dbProcess,
+    processLink: dbProcess.process_link || undefined
+  };
+};
+
 export const DbService = {
   // --- USERS ---
   getUsers: async (): Promise<User[]> => {
@@ -274,7 +282,8 @@ export const DbService = {
       console.error('Error fetching processes:', error.message);
       return { data: [], count: 0 };
     }
-    return { data: data as Process[], count: count || 0 };
+    const mappedData = (data || []).map(mapProcessFromDB);
+    return { data: mappedData as Process[], count: count || 0 };
   },
 
   saveProcess: async (process: Process, performedBy: User): Promise<void> => {
@@ -361,7 +370,7 @@ export const DbService = {
       .eq('number', number)
       .order('entryDate', { ascending: false });
     if (error) throw error;
-    return data as Process[];
+    return (data || []).map(mapProcessFromDB) as Process[];
   },
 
   getAllProcessesForDashboard: async (): Promise<{ data: Process[], count: number }> => {
@@ -375,7 +384,8 @@ export const DbService = {
       console.error('Erro ao buscar dados para dashboard:', error.message);
       return { data: [], count: 0 };
     }
-    return { data: data as Process[], count: count || 0 };
+    const mappedData = (data || []).map(mapProcessFromDB);
+    return { data: mappedData as Process[], count: count || 0 };
   },
 
   getUniqueValues: async (column: 'sector' | 'interested' | 'subject'): Promise<string[]> => {
