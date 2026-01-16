@@ -282,7 +282,8 @@ export const DbService = {
       ...process,
       CGOF: normalizeCGOF(process.CGOF),
       processDate: cleanDate(process.processDate),
-      deadline: cleanDate(process.deadline)
+      deadline: cleanDate(process.deadline),
+      process_link: process.processLink || null
     };
     const { error } = await supabase.from('processes').upsert(payload);
     if (error) throw error;
@@ -304,7 +305,8 @@ export const DbService = {
       ...p,
       CGOF: normalizeCGOF(p.CGOF),
       processDate: cleanDate(p.processDate),
-      deadline: cleanDate(p.deadline)
+      deadline: cleanDate(p.deadline),
+      process_link: p.processLink || null
     }));
     
     const BATCH_SIZE = 100;

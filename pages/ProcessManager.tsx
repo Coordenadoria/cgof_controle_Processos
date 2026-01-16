@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { 
   Search, Plus, Edit, Trash2, Download, AlertTriangle, 
   Flag, X, CheckSquare, Square, Filter, ChevronLeft, ChevronRight, Calendar, Activity, ChevronDown, Check, Loader2, Lock, AlertCircle, Upload, FileText,
-  MapPinOff, CalendarOff, ZoomIn, ZoomOut
+  MapPinOff, CalendarOff, ZoomIn, ZoomOut, ExternalLink
 } from 'lucide-react';
 import { DbService } from '../services/dbService';
 
@@ -711,6 +711,7 @@ export const ProcessManager = () => {
                     <span className="text-blue-600 font-bold text-xs">{getSortIndicator('deadline')}</span>
                   </div>
                 </th>
+                <th className="px-2 py-3">Link</th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
@@ -759,6 +760,16 @@ export const ProcessManager = () => {
                             <span className={`text-[8.5px] uppercase font-bold px-1.5 rounded border mt-0.5 ${status.color}`}>{status.label}</span>
                           </div>
                        ) : <span className="text-slate-300">-</span>}
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap align-top">
+                      {process.processLink ? (
+                        <a href={process.processLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded transition-colors border border-blue-200" title="Abrir link">
+                          <ExternalLink size={14} />
+                          <span className="text-[10px] font-medium">Link</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-300 text-[10px]">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap align-top">
                       <div className="flex items-center justify-end gap-1">
