@@ -363,10 +363,8 @@ export const ProcessManager = () => {
     setEditingProcess(process || null);
     if (process) {
       setOriginalEntryDate(toServerDateOnly(process.entryDate));
-      setEntryDateChanged(false);
     } else {
       setOriginalEntryDate('');
-      setEntryDateChanged(false);
     }
     
     try {
