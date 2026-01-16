@@ -460,12 +460,24 @@ export const ProcessManager = () => {
     };
 
     // Se estamos editando e a data de entrada foi alterada, pedir senha
-    const currentEntryDateFormatted = toServerDateOnly(formData.get('entryDate') as string);
-    if (editingProcess && currentEntryDateFormatted !== originalEntryDate) {
-      setPendingProcessToSave(newProcess);
-      setIsEntryDatePasswordModalOpen(true);
-      setSaving(false);
-      return;
+    if (editingProcess) {
+      const currentEntryDateFormatted = toServerDateOnly(formData.get('entryDate') as string);
+      const originalDate = originalEntryDate || toServerDateOnly(editingProcess.entryDate);
+      const isEntryDateAltered = currentEntryDateFormatted !== originalDate;
+      
+      console.log('Debug editando:', {
+        currentEntryDateFormatted,
+        originalDate,
+        isEntryDateAltered,
+        originalEntryDate
+      });
+      
+      if (isEntryDateAltered) {
+        setPendingProcessToSave(newProcess);
+        setIsEntryDatePasswordModalOpen(true);
+        setSaving(false);
+        return;
+      }
     }
 
     try {
