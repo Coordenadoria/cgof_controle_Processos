@@ -245,14 +245,6 @@ export const ProcessManager = () => {
 
   useEffect(() => { refreshCurrentList(); }, [refreshCurrentList]);
 
-  useEffect(() => {
-    console.log('isEntryDatePasswordModalOpen mudou para:', isEntryDatePasswordModalOpen);
-    if (!isEntryDatePasswordModalOpen && pendingProcessToSave) {
-      console.log('⚠️ PROBLEMA: Modal foi fechado mas ainda há pendingProcessToSave!');
-      console.trace('Stack trace:');
-    }
-  }, [isEntryDatePasswordModalOpen, pendingProcessToSave]);
-
   const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
       setter(value);
       setCurrentPage(1);
@@ -397,7 +389,6 @@ export const ProcessManager = () => {
   };
 
   const handleCloseModal = () => { 
-    console.log('handleCloseModal chamado');
     setIsModalOpen(false); 
     setEditingProcess(null); 
     setNewEntryDate('');
@@ -474,20 +465,10 @@ export const ProcessManager = () => {
       const originalDate = originalEntryDate || toServerDateOnly(editingProcess.entryDate);
       const isEntryDateAltered = currentEntryDateFormatted !== originalDate;
       
-      console.log('Debug editando:', {
-        currentEntryDateFormatted,
-        originalDate,
-        isEntryDateAltered,
-        originalEntryDate,
-        editingProcessId: editingProcess.id
-      });
-      
       if (isEntryDateAltered) {
-        console.log('Abrindo modal de senha...');
         setPendingProcessToSave(newProcess);
         setIsEntryDatePasswordModalOpen(true);
         setSaving(false);
-        console.log('Modal state deve estar true agora');
         return;
       }
     }
@@ -986,7 +967,7 @@ export const ProcessManager = () => {
       )}
 
       {isEntryDatePasswordModalOpen && (
-        <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform">
                 <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center gap-3">
                     <Lock className="text-blue-600" size={24} />
