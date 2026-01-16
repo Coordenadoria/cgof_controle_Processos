@@ -375,10 +375,12 @@ export const ProcessManager = () => {
     if (!formRef.current) return;
     setSaving(true);
     const formData = new FormData(formRef.current);
+    const cgof = formData.get('cgof') as string;
     const entryDate = toServerTimestampNoonLocal(formData.get('entryDate') as string);
     const processDate = toServerTimestampNoonLocal(formData.get('processDate') as string);
     const deadline = toServerTimestampNoonLocal(formData.get('deadline') as string);
     if (!entryDate) { alert("Data de entrada é obrigatória"); setSaving(false); return; }
+    if (!cgof || cgof.trim() === '') { alert("Origem (CGOF) é obrigatória"); setSaving(false); return; }
 
     const now = new Date().toISOString();
     const newProcess: Process = {
@@ -997,8 +999,9 @@ export const ProcessManager = () => {
             <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
-                  <label className="block text-sm font-bold mb-1 text-slate-700">Origem (CGOF)</label>
-                  <select name="cgof" defaultValue={editingProcess?.CGOF || 'Assessoria'} className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100">
+                  <label className="block text-sm font-bold mb-1 text-slate-700">Origem (CGOF) <span className="text-red-600">*</span></label>
+                  <select name="cgof" defaultValue={editingProcess?.CGOF || ''} required className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100">
+                    <option value="">-- Selecione a Origem --</option>
                     {CGOF_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
