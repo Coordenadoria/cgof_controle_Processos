@@ -469,13 +469,16 @@ export const ProcessManager = () => {
         currentEntryDateFormatted,
         originalDate,
         isEntryDateAltered,
-        originalEntryDate
+        originalEntryDate,
+        editingProcessId: editingProcess.id
       });
       
       if (isEntryDateAltered) {
+        console.log('Abrindo modal de senha...');
         setPendingProcessToSave(newProcess);
         setIsEntryDatePasswordModalOpen(true);
         setSaving(false);
+        alert('Modal deve abrir agora'); // Debug
         return;
       }
     }
