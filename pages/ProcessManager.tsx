@@ -168,12 +168,14 @@ export const ProcessManager = () => {
   const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
   const passwordInputRef = useRef<HTMLInputElement>(null);
   
-  const [isEntryDateProtectionModalOpen, setIsEntryDateProtectionModalOpen] = useState(false);
+  const [isEntryDatePasswordModalOpen, setIsEntryDatePasswordModalOpen] = useState(false);
   const [entryDatePassword, setEntryDatePassword] = useState('');
   const [entryDatePasswordError, setEntryDatePasswordError] = useState('');
   const [isVerifyingEntryDatePassword, setIsVerifyingEntryDatePassword] = useState(false);
-  const [entryDatePasswordVerified, setEntryDatePasswordVerified] = useState(false);
-  const [newEntryDate, setNewEntryDate] = useState<string>('');
+  const [pendingProcessToSave, setPendingProcessToSave] = useState<Process | null>(null);
+  const [newEntryDate, setNewEntryDate] = useState('');
+  const [originalEntryDate, setOriginalEntryDate] = useState('');
+  const [entryDateChanged, setEntryDateChanged] = useState(false);
   
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
   const [interestedOptions, setInterestedOptions] = useState<string[]>([]);
@@ -320,23 +322,17 @@ export const ProcessManager = () => {
   };
 
   const handleEntryDateChange = (newDate: string) => {
-    if (editingProcess) {
-      const oldDate = toServerDateOnly(editingProcess.entryDate);
-      if (oldDate !== newDate && oldDate !== '') {
-        // Data está sendo alterada em um processo existente - requer senha
-        setNewEntryDate(newDate);
-        setIsEntryDateProtectionModalOpen(true);
-        return;
-      }
-    }
-    // Novo processo ou data não foi realmente alterada
-    setEntryDatePasswordVerified(true);
     setNewEntryDate(newDate);
+    if (editingProcess && newDate !== originalEntryDate) {
+      setEntryDateChanged(true);
+    } else if (editingProcess && newDate === originalEntryDate) {
+      setEntryDateChanged(false);
+    }
   };
 
   const handleConfirmEntryDatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!currentUser || !pendingProcessToSave) return;
     setIsVerifyingEntryDatePassword(true);
     setEntryDatePasswordError('');
     try {
@@ -346,9 +342,19 @@ export const ProcessManager = () => {
           setIsVerifyingEntryDatePassword(false);
           return;
         }
-        setEntryDatePasswordVerified(true);
-        setIsEntryDateProtectionModalOpen(false);
+        // Senha correta - salvar o processo
+        await saveProcess(pendingProcessToSave);
+        alert(pendingProcessToSave.id && editingProcess ? 'Atualizado com sucesso!' : 'Cadastrado com sucesso!');
+        handleCloseModal();
+        refreshCurrentList();
+        
+        if (isHistoryModalOpen) {
+          const updatedHistory = await fetchProcessHistory(selectedProcessNumber);
+          setSelectedProcessHistory(updatedHistory);
+        }
+        setIsEntryDatePasswordModalOpen(false);
         setEntryDatePassword('');
+        setPendingProcessToSave(null);
     } catch (err: any) {
         setEntryDatePasswordError('Erro ao verificar senha: ' + (err?.message || 'Tente novamente.'));
     }
@@ -361,6 +367,13 @@ export const ProcessManager = () => {
     setLoadingEdit(true);
     setIsModalOpen(true);
     setEditingProcess(process || null);
+    if (process) {
+      setOriginalEntryDate(toServerDateOnly(process.entryDate));
+      setEntryDateChanged(false);
+    } else {
+      setOriginalEntryDate('');
+      setEntryDateChanged(false);
+    }
     
     try {
         const [setoresRpc, interessadasRpc, assuntosRpc] = await Promise.all([
@@ -386,8 +399,13 @@ export const ProcessManager = () => {
   const handleCloseModal = () => { 
     setIsModalOpen(false); 
     setEditingProcess(null); 
-    setEntryDatePasswordVerified(false);
     setNewEntryDate('');
+    setOriginalEntryDate('');
+    setEntryDateChanged(false);
+    setIsEntryDatePasswordModalOpen(false);
+    setEntryDatePassword('');
+    setEntryDatePasswordError('');
+    setPendingProcessToSave(null);
   };
 
   // Função para determinar qual é a Localização Atual baseada nas datas mais recentes
@@ -449,6 +467,14 @@ export const ProcessManager = () => {
       updatedBy: currentUser?.id || 'system',
       updatedAt: now
     };
+
+    // Se estamos editando e a data de entrada foi alterada, pedir senha
+    if (editingProcess && entryDateChanged) {
+      setPendingProcessToSave(newProcess);
+      setIsEntryDatePasswordModalOpen(true);
+      setSaving(false);
+      return;
+    }
 
     try {
         await saveProcess(newProcess);
@@ -943,23 +969,23 @@ export const ProcessManager = () => {
         </div>
       )}
 
-      {isEntryDateProtectionModalOpen && (
+      {isEntryDatePasswordModalOpen && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform">
                 <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center gap-3">
                     <Lock className="text-blue-600" size={24} />
-                    <h3 className="font-bold text-blue-900">Alterar Data de Entrada</h3>
-                    <button onClick={() => { setIsEntryDateProtectionModalOpen(false); setEntryDatePassword(''); }} className="ml-auto text-blue-400 hover:text-blue-700"><X size={20} /></button>
+                    <h3 className="font-bold text-blue-900">Confirmar Alteração de Data de Entrada</h3>
+                    <button onClick={() => { setIsEntryDatePasswordModalOpen(false); setEntryDatePassword(''); setEntryDatePasswordError(''); }} className="ml-auto text-blue-400 hover:text-blue-700"><X size={20} /></button>
                 </div>
                 <form onSubmit={handleConfirmEntryDatePassword} className="p-6 space-y-4">
-                    <p className="text-slate-600 text-sm">A data de entrada é um campo crítico. Confirme sua senha para alterar:</p>
+                    <p className="text-slate-600 text-sm">A data de entrada é um campo crítico. Confirme sua senha para prosseguir com a alteração:</p>
                     <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input type="password" value={entryDatePassword} onChange={(e) => {setEntryDatePassword(e.target.value); setEntryDatePasswordError('');}} className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-200 outline-none" placeholder="Senha de acesso" required autoFocus />
                     </div>
                     {entryDatePasswordError && <div className="text-red-600 text-xs flex items-center gap-1 font-medium"><AlertCircle size={12}/>{entryDatePasswordError}</div>}
                     <div className="flex gap-3">
-                        <button type="button" onClick={() => { setIsEntryDateProtectionModalOpen(false); setEntryDatePassword(''); }} className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium border border-slate-200">Cancelar</button>
+                        <button type="button" onClick={() => { setIsEntryDatePasswordModalOpen(false); setEntryDatePassword(''); setEntryDatePasswordError(''); }} className="flex-1 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium border border-slate-200">Cancelar</button>
                         <button type="submit" disabled={isVerifyingEntryDatePassword || !entryDatePassword} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium flex justify-center items-center gap-2 hover:bg-blue-700 shadow-sm">{isVerifyingEntryDatePassword ? <Loader2 size={16} className="animate-spin" /> : 'Confirmar'}</button>
                     </div>
                 </form>
@@ -1113,11 +1139,10 @@ export const ProcessManager = () => {
                     type="date" 
                     defaultValue={toServerDateOnly(editingProcess?.entryDate) || getTodayLocalISO()} 
                     onChange={(e) => handleEntryDateChange(e.target.value)}
-                    disabled={editingProcess && !entryDatePasswordVerified}
-                    className={`w-full p-2 border rounded-lg outline-none text-sm focus:ring-2 ${entryDatePasswordVerified || !editingProcess ? 'border-slate-300 focus:ring-blue-100 cursor-text' : 'border-red-300 bg-red-50 cursor-not-allowed focus:ring-red-200'}`}
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100 cursor-text"
                   />
-                  {editingProcess && !entryDatePasswordVerified && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1"><Lock size={12} /> Requer confirmação de senha para alterar</p>
+                  {editingProcess && entryDateChanged && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertCircle size={12} /> Será solicitada confirmação de senha ao salvar</p>
                   )}
                 </div>
                 <div>
