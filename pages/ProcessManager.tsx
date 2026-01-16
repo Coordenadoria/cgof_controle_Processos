@@ -848,7 +848,6 @@ export const ProcessManager = () => {
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => handleOpenHistory(process)} className="p-1 text-slate-600 hover:text-blue-600 rounded" title="Ver Histórico"><Activity size={16} /></button>
                         <button onClick={() => handleOpenModal(process)} className="p-1 text-slate-600 hover:text-blue-600 rounded" title="Editar"><Edit size={16} /></button>
-                        <button onClick={() => { setSelectedProcessNumber(process.number); setDeleteType('movement'); setIsPasswordModalOpen(true); }} className="p-1 text-slate-400 hover:text-red-600 rounded" title="Excluir última movimentação"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -1046,20 +1045,6 @@ export const ProcessManager = () => {
                                                     title="Editar esta movimentação"
                                                 >
                                                     <Edit size={16} />
-                                                </button>
-                                                <button 
-                                                    onClick={() => {
-                                                      if (confirm('Tem certeza que deseja excluir esta movimentação?')) {
-                                                        setSelectedProcessNumber(item.number);
-                                                        setSelectedMovementToDelete(item);
-                                                        setDeleteType('movement');
-                                                        setIsPasswordModalOpen(true);
-                                                      }
-                                                    }} 
-                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title="Excluir esta movimentação"
-                                                >
-                                                    <Trash2 size={16} />
                                                 </button>
                                             </div>
                                         </div>
