@@ -245,6 +245,10 @@ export const ProcessManager = () => {
 
   useEffect(() => { refreshCurrentList(); }, [refreshCurrentList]);
 
+  useEffect(() => {
+    console.log('isEntryDatePasswordModalOpen mudou para:', isEntryDatePasswordModalOpen);
+  }, [isEntryDatePasswordModalOpen]);
+
   const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
       setter(value);
       setCurrentPage(1);
@@ -478,7 +482,7 @@ export const ProcessManager = () => {
         setPendingProcessToSave(newProcess);
         setIsEntryDatePasswordModalOpen(true);
         setSaving(false);
-        alert('Modal deve abrir agora'); // Debug
+        console.log('Modal state deve estar true agora');
         return;
       }
     }
