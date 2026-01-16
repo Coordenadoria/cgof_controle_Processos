@@ -247,7 +247,11 @@ export const ProcessManager = () => {
 
   useEffect(() => {
     console.log('isEntryDatePasswordModalOpen mudou para:', isEntryDatePasswordModalOpen);
-  }, [isEntryDatePasswordModalOpen]);
+    if (!isEntryDatePasswordModalOpen && pendingProcessToSave) {
+      console.log('⚠️ PROBLEMA: Modal foi fechado mas ainda há pendingProcessToSave!');
+      console.trace('Stack trace:');
+    }
+  }, [isEntryDatePasswordModalOpen, pendingProcessToSave]);
 
   const handleFilterChange = (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
       setter(value);
@@ -393,6 +397,7 @@ export const ProcessManager = () => {
   };
 
   const handleCloseModal = () => { 
+    console.log('handleCloseModal chamado');
     setIsModalOpen(false); 
     setEditingProcess(null); 
     setNewEntryDate('');
