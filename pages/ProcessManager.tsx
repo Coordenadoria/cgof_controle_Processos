@@ -175,7 +175,6 @@ export const ProcessManager = () => {
   const [pendingProcessToSave, setPendingProcessToSave] = useState<Process | null>(null);
   const [newEntryDate, setNewEntryDate] = useState('');
   const [originalEntryDate, setOriginalEntryDate] = useState('');
-  const [entryDateChanged, setEntryDateChanged] = useState(false);
   
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
   const [interestedOptions, setInterestedOptions] = useState<string[]>([]);
@@ -323,11 +322,6 @@ export const ProcessManager = () => {
 
   const handleEntryDateChange = (newDate: string) => {
     setNewEntryDate(newDate);
-    if (editingProcess && newDate !== originalEntryDate) {
-      setEntryDateChanged(true);
-    } else if (editingProcess && newDate === originalEntryDate) {
-      setEntryDateChanged(false);
-    }
   };
 
   const handleConfirmEntryDatePassword = async (e: React.FormEvent) => {
@@ -401,7 +395,6 @@ export const ProcessManager = () => {
     setEditingProcess(null); 
     setNewEntryDate('');
     setOriginalEntryDate('');
-    setEntryDateChanged(false);
     setIsEntryDatePasswordModalOpen(false);
     setEntryDatePassword('');
     setEntryDatePasswordError('');
@@ -469,7 +462,8 @@ export const ProcessManager = () => {
     };
 
     // Se estamos editando e a data de entrada foi alterada, pedir senha
-    if (editingProcess && entryDateChanged) {
+    const currentEntryDateFormatted = toServerDateOnly(formData.get('entryDate') as string);
+    if (editingProcess && currentEntryDateFormatted !== originalEntryDate) {
       setPendingProcessToSave(newProcess);
       setIsEntryDatePasswordModalOpen(true);
       setSaving(false);
@@ -1141,9 +1135,6 @@ export const ProcessManager = () => {
                     onChange={(e) => handleEntryDateChange(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-100 cursor-text"
                   />
-                  {editingProcess && entryDateChanged && (
-                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1"><AlertCircle size={12} /> Será solicitada confirmação de senha ao salvar</p>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1 text-slate-700">Número do Processo</label>
