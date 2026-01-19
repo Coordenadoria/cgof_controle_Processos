@@ -284,7 +284,29 @@ export const ProcessManager = () => {
             if (new Date(p.entryDate) > new Date(existing.entryDate)) map.set(p.number, p);
         }
     });
-    return Array.from(map.values());
+    
+    // Ordenar: Urgentes e Vencidos no topo, depois o resto
+    return Array.from(map.values()).sort((a, b) => {
+      const today = new Date(); 
+      today.setHours(0, 0, 0, 0);
+      
+      const aIsUrgent = a.urgent;
+      const bIsUrgent = b.urgent;
+      
+      const aIsOverdue = a.deadline ? new Date(a.deadline) < today : false;
+      const bIsOverdue = b.deadline ? new Date(b.deadline) < today : false;
+      
+      // Urgentes vêm primeiro
+      if (aIsUrgent && !bIsUrgent) return -1;
+      if (!aIsUrgent && bIsUrgent) return 1;
+      
+      // Depois vencidos
+      if (aIsOverdue && !bIsOverdue) return -1;
+      if (!aIsOverdue && bIsOverdue) return 1;
+      
+      // Resto mantém a ordem por updatedAt (mais recentes primeiro)
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
   }, [processes]);
 
   const availableCgofs = useMemo(() => {
@@ -792,12 +814,41 @@ export const ProcessManager = () => {
               {uniqueProcesses.map(process => {
                 const status = getDeadlineStatus(process.deadline);
                 const dynamicRowStyle = { fontSize: `${tableFontSize}px` };
+                
+                // Determinar cor de fundo baseado no status
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isOverdue = process.deadline ? new Date(process.deadline) < today : false;
+                
+                let rowBgClass = 'hover:bg-blue-50/30';
+                if (process.urgent && isOverdue) {
+                  rowBgClass = 'bg-red-100/60 hover:bg-red-100/80'; // Urgente e vencido - vermelho mais forte
+                } else if (process.urgent) {
+                  rowBgClass = 'bg-orange-100/60 hover:bg-orange-100/80'; // Urgente - laranja
+                } else if (isOverdue) {
+                  rowBgClass = 'bg-red-50/60 hover:bg-red-50/80'; // Vencido - vermelho suave
+                }
+                
                 return (
-                  <tr key={process.id} className={`group hover:bg-blue-50/30 transition-colors ${selectedIds.has(process.id) ? 'bg-blue-50/80' : ''}`}>
+                  <tr key={process.id} className={`group transition-colors ${rowBgClass} ${selectedIds.has(process.id) ? 'bg-blue-50/80' : ''}`}>
                     <td className="px-4 py-2">
-                      <button onClick={() => { const s = new Set(selectedIds); if (s.has(process.id)) s.delete(process.id); else s.add(process.id); setSelectedIds(s); }}>
-                         {selectedIds.has(process.id) ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { const s = new Set(selectedIds); if (s.has(process.id)) s.delete(process.id); else s.add(process.id); setSelectedIds(s); }}>
+                           {selectedIds.has(process.id) ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} />}
+                        </button>
+                        <div className="flex items-center gap-1">
+                          {process.urgent && (
+                            <div className="flex items-center justify-center w-5 h-5 bg-orange-500 rounded-full" title="Urgente">
+                              <Flag size={12} className="text-white" />
+                            </div>
+                          )}
+                          {isOverdue && (
+                            <div className="flex items-center justify-center w-5 h-5 bg-red-600 rounded-full" title="Vencido">
+                              <AlertTriangle size={12} className="text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td style={dynamicRowStyle} className="px-2 py-2 font-mono text-slate-900 whitespace-nowrap align-top font-bold">
                         <button onClick={() => handleOpenHistory(process)} className="hover:underline text-blue-700">{process.number}</button>
